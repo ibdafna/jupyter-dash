@@ -3,12 +3,16 @@ import shutil
 from subprocess import check_call
 import json
 import time
-
+from pathlib import Path
 from setuptools import setup, Command
 
-here = os.path.dirname(os.path.abspath(__file__))
-is_repo = os.path.exists(os.path.join(here, ".git"))
+# Package name
+package_name = "jupyter_dash"
 
+# Use Pathlib for path traversal
+here = Path(__file__).parent.resolve()
+is_repo = here.joinpath(".git").exists()
+src_dir = here.joinpath(package_name)
 
 # Load __version__ using exec so that we don't import jupyter_dash module
 main_ns = {}
@@ -17,11 +21,11 @@ exec(open("jupyter_dash/version.py").read(), main_ns)  # pylint: disable=exec-us
 
 def get_labextension_version():
     if is_repo:
-        labextension_dir = os.path.join(here, "extensions", "jupyterlab")
+        labextension_dir = here.joinpath("extensions").joinpath("jupyterlab")
     else:
-        labextension_dir = os.path.join(here, "jupyter_dash", "labextension")
+        labextension_dir = here.joinpath("jupyter_dash").joinpath("labextension")
 
-    package_json = os.path.join(labextension_dir, 'package.json')
+    package_json = labextension_dir.joinpath('package.json')
     with open(package_json, 'rt') as f:
         package_data = json.load(f)
 
@@ -36,6 +40,19 @@ def js_prerelease(command):
             self.run_command("build_js")
             command.run(self)
     return DecoratedCommand
+
+# Representative files that should exist after a successful build
+# js_targets = [
+#     here.joinpath('jupyter_dash').joinpath('nbextension').joinpath('index.js'),
+#     here.joinpath('jupyter_dash').joinpath('labextension').joinpath('package.json')
+# ]
+
+# data_files_spec = [
+#     ('share/jupyter/nbextensions/jupyter_dash', 'jupyter_dash/nbextension', '*.*'),
+#     ('share/jupyter/labextensions/jupyter_dash', 'jupyter_dash/labextension', "**"),
+#     ('etc/jupyter/nbconfig/notebook.d', '.', 'jupyter_dash.json'),
+# ]
+
 
 
 class BuildLabextension(Command):
@@ -84,10 +101,10 @@ class BuildLabextension(Command):
             ['jlpm', "build"],
             cwd=in_labextension_dir,
         )
-        check_call(
-            ['jlpm', "pack", "--filename", dist_path + "/" + filename],
-            cwd=in_labextension_dir,
-        )
+        # check_call(
+        #     ['jlpm', "pack", "--filename", dist_path + "/" + filename],
+        #     cwd=in_labextension_dir,
+        # )
 
         # Copy README to extension directory so npm finds it
         shutil.copy(
@@ -142,11 +159,9 @@ setup(
             "jupyter_dash/nbextension/jupyter_dash.json"
         ]),
         # Place jupyterlab extension in extension directory
-        ("share/jupyter/lab/extensions", [
-            "jupyter_dash/labextension/dist/jupyterlab-dash-v{ver}.tgz".format(
-                ver=get_labextension_version()
-            )
-        ]),
+        ("share/jupyter/labextensions/jupyter_dash", 
+            list(map(str, list(here.rglob("./jupyter_dash/labextension/**/*"))))
+        ),
     ],
     cmdclass=dict(
         build_js=BuildLabextension,
